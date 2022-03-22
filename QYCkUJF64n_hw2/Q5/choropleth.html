@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+    <!-- add title -->
+    <title>Choropleth Map of Board Game Ratings</title> 
+    <!-- import required libraries here -->
+    <script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+    <script type="text/javascript" src="../lib/d3-dsv.min.js"></script>
+    <script type="text/javascript" src="../lib/d3-geo-projection.v2.min.js"></script>
+    <script type="text/javascript" src="../lib/d3-tip.min.js"></script>
+    <script type="text/javascript" src="../lib/topojson.v2.min.js"></script>
+    <script type="text/javascript" src="../lib/d3-legend.min.js"></script>
+    <style>
+        /* define CSS rules here */
+    
+    </style>
+
+    <title></title>
+</head>
+
+
+<body>
+    <!-- Add heading for the visualization -->
+    <h1>Average Rating of Board Games Across the world</h1>
+    <!-- Create dropdown element here. Options should be added after reading in game file, they should not be created here.-->
+    <select id = "gameDropdown"></select>
+    <!-- append visualization svg to this div-->
+    <div id="tooltip"></div>
+
+    <script>
+    
+        // enter code to define margin and dimensions for svg
+        var margin = {top: 20, right: 10, bottom: 20, left: 10};
+        var width = 960 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+        // enter code to create svg
+        var svg = d3.select("body").append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+        // enter code to create color scale
+        // enter code to define tooltip
+        var tooltip = d3.select("#tooltip")
+            .append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 1)
+            .style("background-color", "white")
+            .style("border", "solid")
+            .style("border-width", "2px")
+            .style("border-radius", "5px")
+            .style("padding", "5px")
+
+        // enter code to define projection and path required for Choropleth
+        // For grading, set the name of functions for projection and path as "projection" and "path"
+        var projection = d3.geoNaturalEarth().translate([width/2, height/2]);
+        var path = d3.geoPath().projection(projection)
+
+        // define any other global variables 
+         var world_map = d3.json("world_countries.json"),
+         csv = d3.csv("ratings-by-country.csv");
+
+        Promise.all([world_map, csv]).then(function(values){
+            // enter code to call ready() with required arguments
+            ready(values[0], values[1])
+        }
+        );
+        
+        // this function should be called once the data from files have been read
+        // world: topojson from world_countries.json
+        // gameData: data from ratings-by-country.csv
+        
+        function ready(world, gameData) {
+            // enter code to extract all unique games from gameData
+            //console.log(world)
+            //console.log(gameData)
+            //var select = d3.select('body')
+            //.append("select")
+            //.attr('id', 'gamDropdown')
+            var list_Game = []
+            //random name
+            tmp = '000'
+            for (var i = 0; i < gameData.length; i++){
+                if (gameData[i].Game != tmp){
+                    tmp = gameData[i].Game
+                    list_Game.push(tmp)
+                }
+            }
+            list_Game.sort();
+
+            d3.select('#gameDropdown')
+            .selectAll('option')
+            .data(list_Game)
+            .enter()
+            .append('option')
+            .attr('value', function(d){return d;})
+            .text(function(d){return d;});
+
+            d3.select('#gameDropdown')
+            .on("change", function(d){
+                var selectedGame = d3.select(this).property("value")
+                d3.select("body").select('#svg').selectAll("g").remove()
+                createMapAndLegend(world, gameData, selectedGame)
+                })
+            //default map
+            createMapAndLegend(world, gameData, list_Game[0])
+
+        }
+
+             function createMapAndLegend(world, gameData, selectedGame){  
+            //console.log(world)
+            //console.log(gameData)
+            // changing the updated dataframe depending on the game selected
+            var game_info = []
+            for (var i = 0; i < gameData.length; i++){
+                if (gameData[i].Game == selectedGame){
+                    game_info.push(gameData[i])
+                }
+            }
+            console.log(game_info)
+
+            // color depends on the rating
+            var rating = []
+            for (var i = 0; i < game_info.length; i++){
+                rating_num =parseFloat(game_info[i]['Average Rating'])
+                rating.push(rating_num)
+            }
+            //console.log(rating)
+            rating = rating.sort(function(a,b) {return d3.ascending(a,b)});
+            console.log(rating)
+            var color = ['#E9967A', '#F08080', '#FF7F50', '#FF0000']
+            var colorScale = d3.scaleQuantile();
+            colorScale
+            .domain(rating)
+            .range(color)
+            console.log(colorScale)
+            world.features = world.features.map(d =>{
+        	for(var i=0;i<game_info.length;i++){
+        		if(d.properties.name == game_info[i].Country){
+                    //console.log(d)
+        			d.properties['Game'] = game_info[i].Game;
+        			d.properties['Users_num'] = game_info[i]['Number of Users'];
+        			d.properties['avg_Rating'] = parseFloat(game_info[i]['Average Rating']);
+        		}
+        	}
+    		return d;
+    	})
+            console.log(world.features)
+            //--------------------map --------------------------
+            svg.append('g')
+            .attr('id', 'countries')
+            .selectAll('path')
+            .data(world.features)
+            .enter()
+            .append('path')
+            .attr('class', 'continent')
+            .attr('d', path)
+            .attr('fill',function (d){if(typeof (d.properties['avg_Rating']) !== 'undefined'){
+                return colorScale(d.properties['avg_Rating']);
+         		}
+         		else{
+         			return "grey"}})
+
+            
+            
+            
+        }
+    </script>
+
+</body>
+
+</html>
+        
+   ;

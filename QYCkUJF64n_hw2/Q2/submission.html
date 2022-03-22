@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+
+path.link0 {
+  fill: none;
+  stroke: #666;
+  stroke-width: 3px;
+}
+path.link1 {
+    fill:none;
+    stroke: green;
+    stroke-width: 1.5px;
+    stroke-dasharray: 1.5px
+}
+circle {
+  fill: #ccc;
+  stroke: #fff;
+  stroke: black;
+  stroke-width: 1.5px;
+}
+
+text {
+  fill: #000;
+  font: 10px sans-serif;
+  pointer-events: none;
+}
+
+</style>
+<meta charset="utf-8">
+<title></title></head>
+
+<body>
+<script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+<script>
+
+d3.dsv(",", "board_games.csv", function(d) {
+  return {
+    source: d.source,
+    target: d.target,
+    value: +d.value
+  }
+}).then(function(data) {
+
+  var links = data;
+
+  var nodes = {};
+
+  // compute the distinct nodes from the links.
+  links.forEach(function(link) {
+      link.source = nodes[link.source] || (nodes[link.source] = {name: link.source});
+      link.target = nodes[link.target] || (nodes[link.target] = {name: link.target});
+  });
+
+  var width = 1200,
+      height = 700;
+
+  var force = d3.forceSimulation()
+      .nodes(d3.values(nodes))
+      .force("link", d3.forceLink(links).distance(100))
+      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force("x", d3.forceX())
+      .force("y", d3.forceY())
+      .force("charge", d3.forceManyBody().strength(-250))
+      .alphaTarget(1)
+      .on("tick", tick);
+  
+
+  var svg = d3.select("body").append("svg")
+      .attr("width", width)
+      .attr("height", height);
+    //adding gradiant color in svg def
+  // adding color gradiant
+  var colors = d3.scaleLinear()
+    .domain([3,6])
+    .range(['#edf8fb', '#8c96c6', '#810f7c']);
+
+  // add the links
+  var path = svg.append("g")
+      .selectAll("path")
+      .data(links)
+      .enter()
+      .append("path")
+      .attr("class", function(d) {
+          // The 'style must have space in order to draw the graph'
+          if(d.value == 0) {
+              return 'link0 ' + d.type;
+          }
+           else{
+               return 'link1 ' + d.type;
+           } });
+
+  // define the nodes
+  var node = svg.selectAll(".node")
+      .data(force.nodes())
+      .enter().append("g")
+      .attr("class", "node")
+      .call(d3.drag()
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended))
+          .on('dblclick', releasenode);
+
+    // Add degree
+    d3.selectAll('g.node')
+        .each(function(d) {
+        d.degree = 0;
+  });
+
+  // Calculate degree
+links.forEach(function(d){
+    d.source.degree += 1;
+    d.target.degree += 1;
+  });
+
+// min and max degree
+var minDegree = d3.min(
+  d3.values(nodes), function(d) {
+    return d.degree; })
+
+var maxDegree = d3.max(
+  d3.values(nodes), function(d) { 
+    return d.degree; })
+
+// Create node scale 
+var nodescale = d3.scaleSqrt()
+  .domain( [minDegree, maxDegree] )
+  .range( [3, 25] ); 
+  
+  // add the nodes
+  node.append("circle")
+    .attr("id", function(d) {
+                    return (d.name.replace(/\s+/g, '').toLowerCase());
+                })
+    .style('fill', function(d){
+        return colors(nodescale(d.degree));
+    })
+    .attr('r', function(d){
+        return nodescale(d.degree);
+    })
+    
+  
+
+
+// Add the node labels
+  node.append("text")
+      .style('font-weight', 800)
+      .text(function(d){
+          return d.name
+      })
+      .attr("dx", function(d) {
+        return 5;
+        })
+      .attr("dy", function(d) {
+        return -5;
+});
+    //Add the GT username
+    svg.append("text")
+        .attr("transform", "translate(" + (width-500) + "," + (30) + ")")
+        .attr('id','credit')
+        .style("font-weight", 800)
+        .text("hsong343");
+
+        
+      
+  // add the curvy lines
+  function tick() {
+      path.attr("d", function(d) {
+          var dx = d.target.x - d.source.x,
+              dy = d.target.y - d.source.y,
+              dr = Math.sqrt(dx * dx + dy * dy);
+          return "M" +
+              d.source.x + "," +
+              d.source.y + "A" +
+              dr + "," + dr + " 0 0,1 " +
+              d.target.x + "," +
+              d.target.y;
+      });
+
+      node.attr("transform", function(d) {
+          return "translate(" + d.x + "," + d.y + ")"; 
+      });
+  };
+
+  function dragstarted(d) {
+      if (!d3.event.active) force.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+  };
+
+  function dragged(d) {
+      d.fx = d3.event.x;
+      d.fy = d3.event.y;
+      d3this = d3.select(this)
+            .append("circle")
+            .style('fill', '#bd0026')
+            .attr('r', function(d){
+        return nodescale(d.degree);
+    });
+      
+  };
+
+  function dragended(d) {
+      if(d.fixed){
+        d.fixed =false;
+    }
+    else{
+        d.fixed = true;
+    }
+
+      if (!d3.event.active) force.alphaTarget(0);
+      if (d.fixed) {
+          d.fx = d.x;
+          d.fy = d.y;
+          }
+    
+  };
+
+  function releasenode(d){
+    if (d.fixed){
+      d.fx = null;
+    d.fy = null;
+    d.fixed = false;
+    d3this = d3.select(this)
+            .append("circle")
+            .style('fill', function(d){
+        return colors(nodescale(d.degree));
+    })
+    .attr('r', function(d){
+        return nodescale(d.degree);
+    })
+    }
+    else {
+      d.fixed = true;
+      d.fx = d.x;
+      d.fy = d.y;
+      d3this = d3.select(this)
+            .append("circle")
+            .style('fill', '#bd0026')
+            .attr('r', function(d){
+        return nodescale(d.degree);
+    });
+    }
+  };
+  
+}).catch(function(error) {
+  console.log(error);
+});
+
+</script>
+</body>
+</html>

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+
+<!-- To view in browser: python3 -m http.server 8080 & -->
+<!-- Then visit http://0.0.0.0:8080/interactive.html in your browser -->
+<head>
+  <title>Games Rating: 2015 - 2019</title>
+  <meta charset="utf-8">
+  <style>
+    @media print {
+    .pagebreak { page-break-before: always; } /* page-break-after works, as well */
+}
+  </style>
+</head>
+
+<body>
+  <script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+  <script type="text/javascript" src="../lib/d3-dsv.min.js"></script>
+
+  <!-- Example hiding an element -->
+  <!-- <g id="" style"display:none;" /> -->
+
+  <!-- Example of styling an element -->
+  <!-- svg_element.style()-->
+
+  <script>
+    // define the dimensions and margins for the line chart
+    // Use the same Margin Convention from HW1 Q3: https://poloclub.github.io/cse6242-2022spring-online/hw1/8rEHLaYmr9 _margin_convention.pdf to layout your graph
+
+    // ----------------------------Define the margin(Bar chart)-------------------------
+    
+    var margin = {top: 80, right: 80, bottom: 80, left: 80};
+    var width = 960 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+    
+    // append svg element to the body of the page
+    // set dimensions and position of the svg element
+
+    //----------------------------svg element margin-----------------------------
+    let svg = d3
+      .select("body")
+      .append("svg")
+      .attr("id", "line_chart")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("id", "container")
+      .attr("transform",
+        "translate(" + margin.left + "," + margin.top + ")");
+
+    //---------------------------- funciton predefined----------------------------
+    // define function to parse time in years format
+    function timeConvert(value){
+      return d3.timeParse('%Y')(value)
+    }
+    // ading color option
+    var colors = [d3.schemeCategory10[0], d3.schemeCategory10[1], d3.schemeCategory10[2], d3.schemeCategory10[3],d3.schemeCategory10[4]]
+
+    //--------------------------fetch data ------------------------------------
+	var pathToCsv = "average-rating.csv";
+    d3.dsv(",", pathToCsv, function (d) {
+      return {
+        // format data attributes if required
+        name: d.name,
+        year: d.year,
+        avg_rating: parseInt(Math.floor(d.average_rating)),
+        user_rated: parseInt(d.users_rated)
+
+      }
+    }).then(function (data) {
+      //console.log(data); // you should see the data in your browser's developer tools console
+    
+    //---------------------------- Group by rating adn by year --------------------------------
+    var groupByRating = d3.nest()
+      .key(function (d) { return d.year;})
+      .key(function (d) { return d.avg_rating; })
+      .entries(data)
+      //.rollup(function(leaves) { return leaves.length;})
+    
+    //console.log(groupByRating); 
+    
+    var dictyear = new Array();
+    // limit the year to 2015-2019
+    for (var i = 0; i< groupByRating.length; i++){
+      if (groupByRating[i].key >= 2015 && groupByRating[i].key<=2019){
+        dictyear.push(groupByRating[i]);
+      }
+    }
+    var keys = ['0','1', '2', '3', '4', '5', '6','7', '8','9']
+    var colorID = 0
+    // add dummy 0 to the data missing
+    for (var i = 0; i< dictyear.length; i++){
+      // adding value info
+      for (var l = 0; l < Object.values(dictyear[i].values).length; l++){
+        var count = Object.values(dictyear[i].values[l].values).length;
+        dictyear[i].values[l]['value'] = count;
+      }
+      var list_key = new Array();
+      for (var k = 0; k<Object.values(dictyear[i].values).length; k++){
+        list_key.push(Object.values(dictyear[i].values)[k].key);
+      }
+      //console.log(list_key);
+      let difference = keys.filter(x => !list_key.includes(x));
+      //console.log(difference)
+      for (var j = 0; j< difference.length; j++){
+        var valueToPush = {};
+        valueToPush['key'] = difference[j];
+        valueToPush['value'] = 0;
+        dictyear[i].values.push(valueToPush);
+      }
+      dictyear[i].values.sort((a, b) => a.key -b.key)
+      //adding colorID
+      dictyear[i]['colorId'] = colorID;
+      colorID++;
+      }
+    console.log(dictyear)
+
+      /* Create bar plot using data from csv */
+    // --------------------AXES --------------------------------
+    let xScale = d3.scaleLinear()
+    .domain([0,9])
+    .range([0,width])
+
+    let yScale = d3.scaleLinear()
+    .domain([0, d3.max(dictyear, function(d) { return d3.max(d.values, function(d){return d.value; })})])
+    .range([height, 0])
+
+
+  //---------------------------- Line--------------------------------
+  const line = d3.line()
+    .x(function(d) {
+     return xScale(d.key); })
+    .y(function(d) {
+     return yScale(d.value); })
+  
+
+  //-----------------------------Circles-----------------------------
+
+
+  //-------appending elenments to svg element---------------------
+  //----------------------------labels--------------------------------
+  svg.append('text')
+  .attr('x', width/2)
+  .attr('y', 0)
+  .style("text-anchor", "middle")
+  .text("Board games by Rating 2015-2019")
+  .attr('id', 'line_chart_title')
+
+  svg.append('text')
+  .attr('x', width/2)
+  .attr('y', 20)
+  .style("text-anchor", "middle")
+  .text("hsong343")
+  .attr('id', 'credit')
+
+  svg.append("text")
+  .attr("transform", "rotate(-90)")
+  .attr("y", -60)
+  .attr("x", -(height/2))
+  .style("text-anchor", "middle")
+  .text("Count");
+
+  svg.append("text")
+  .attr("y", height+40)
+  .attr("x", width/2)
+  .style("text-anchor", "middle")
+  .text("Rating");
+  //-------------------------AXES--------------------------------
+  svg.append("g")
+  .attr('transform','translate(0,'+ height + ')')
+  .call(d3.axisBottom(xScale))
+  .attr('id', 'x-axis-lines');
+
+  svg.append('g')
+  .call(d3.axisLeft(yScale))
+  .attr('id', 'y-axis-lines');
+  //--------------------Path-------------------------------------
+   lines =svg.append('g')
+  .attr('id', 'lines')
+    
+  id = 'line-'+i.toString();
+  lines.selectAll(id)
+  .data(dictyear)
+  .enter()
+  .append('path')
+  .attr("class", id)
+  .attr('d', function(d){ return line(d.values);})
+  .attr('fill', 'none')
+  .attr("stroke-width", '1.5px')
+  .attr('stroke', function(d){ return colors[d.colorId]})
+  
+//-----------------------------Circles-----------------------------
+  symbol = svg.append('g')
+  .attr('id', 'circles')
+  
+  for (var i = 0; i < dictyear.length; i++){
+  idc = 'circle-'+i.toString();
+  symbol.selectAll(idc)
+  .data(dictyear[i].values)
+  .enter()
+  .append('circle')
+  .attr('class', idc)
+  .attr('cx',function(d) {
+     return xScale(d.key); })
+  .attr('cy',(function(d) {
+     return yScale(d.value); }))
+  .attr('r', 5)
+  .attr('fill', function(d) { return colors[i]})
+  .on('mouseover',handleMouseOver)
+  .on('mouseout', handlesMouseOut);
+}
+//--------------------legends--------------------------------
+var legend = svg.append('g')
+.attr('id', 'legend');
+
+var years = ['2015', '2016', '2017','2018','2019'];
+
+for (var i = 0; i < dictyear.length; i++){
+idl= 'legend-'+i.toString();
+
+legend.append('text')
+.attr('x', width - 8)
+.attr('y', i *20)
+.text(years[i])
+
+
+legend.append('circle')
+.attr('class', idl)
+.attr('cx', width -20)
+.attr('cy', i*20)
+.attr('r', 5)
+.attr('fill', function(d) { return colors[i]});
+}
+
+// ----------------------Bar chart------------------------------
+//----------------------------mouse over and out function--------------------
+
+
+    }).catch(function (error) {
+      console.log(error);
+    });
+    </script>
+    <div class="pagebreak"> </div>
+  <script>
+    // ----------------------------bar chart ----------------------------
+    //----------------------------mouse over and out function--------------------
+    function handleMouseOver(d,i){
+      d3.select(this).attr("r",10);
+    //----------------------------svg element margin-----------------------------
+    var margin_2 = {top: 80, right: 160, bottom: 80, left: 160};
+    let svg_2 = d3
+      .select("body")
+      .append("svg")
+      .attr("id", "bar_chart")
+      .attr("width", width + margin_2.left + margin.right)
+      .attr("height", height + margin_2.top + margin_2.bottom)
+      .append("g")
+      .attr("id", "container_2")
+      .attr("transform",
+        "translate(" + margin_2.left + "," + margin_2.top + ")");
+
+
+      //console.log(d); // you should see the data in your browser's developer tools console
+    
+   
+    //sort by user rated and find the top 5
+    try {
+    var new_data = d.values.sort((a,b) => b.user_rated - a.user_rated).slice(0,5);
+    d.values =new_data;
+  
+
+      /* Create bar plot using data from csv */
+    // --------------------AXES --------------------------------
+    let xScale_2 = d3.scaleLinear()
+    .domain([0,d3.max(d.values, function(d) { return d.user_rated})])
+    .range([0,width*2/3])
+
+    let yScale_2 = d3.scaleBand()
+    .domain(d.values.map(function(d) { return d.name.substring(0,10)}))
+    .range([0, height])
+    .padding(0,2)
+    
+
+  //-----------------------------Circles-----------------------------
+
+
+  //-------appending elenments to svg element---------------------
+  //----------------------------labels--------------------------------
+  svg_2.append('text')
+  .attr('x', width/2)
+  .attr('y', -20)
+  .style("text-anchor", "middle")
+  .text("Top 5 most rated games of " + d.values[0].year + ' with rating ' + d.values[0].avg_rating )
+  .attr('id', 'bar_chart_title')
+
+  svg_2.append("text")
+  .attr("transform", "rotate(-90)")
+  .attr("y", -60)
+  .attr("x", -(height/2))
+  .style("text-anchor", "middle")
+  .text("number of users")
+  .attr('id', 'bar_x_axis_label');
+
+  svg_2.append("text")
+  .attr("y", height+40)
+  .attr("x", width/2)
+  .style("text-anchor", "middle")
+  .text("games")
+  .attr('id', 'bar_y_axis_label');
+  //-------------------------AXES--------------------------------
+  svg_2.append("g")
+  .attr('transform','translate(0,'+ height + ')')
+  .call(d3.axisBottom(xScale_2))
+  .attr('id', 'x-axis-bars');
+  
+  svg_2.append('g')
+  .call(d3.axisLeft(yScale_2))
+  .attr('id', 'y-axis-bars');
+
+  var bar = svg_2.append('g')
+  .attr('id', 'bars');
+
+  if (d.values[0] != undefined){
+  bar.selectAll('rect')
+  .data(d.values)
+  .enter()
+  .append('rect')
+  .attr('class', 'bar')
+  .attr("x", 0)
+  .attr("y", d => yScale_2(d.name.substring(0,10)))
+  .attr("width", d => xScale_2(d.user_rated))
+  .attr("height", 35)
+  .attr("fill", 'black');}}
+  catch(err){
+    }
+  
+  
+  //--------------------Path-------------------------------------
+  
+// ----------------------Bar chart------------------------------
+  }
+
+
+    
+    function handlesMouseOut(d,i){
+      d3.select(this)
+      .attr('r', 5)
+
+      d3.select('body').select('#bar_chart').remove()
+    }
+
+  </script>
+
+</body>
